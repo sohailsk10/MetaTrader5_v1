@@ -11,7 +11,9 @@ from sklearn.preprocessing import StandardScaler
 from urllib.parse import quote
 from sqlalchemy import create_engine
 silence_tensorflow()
-import psycopg2
+# import psycopg2
+import mysql.connector
+from Database import database_connection
 
 
 N_PAST = 48
@@ -32,18 +34,26 @@ for i in currency_ticks:
 
 prediction_list = []
 
-mydb = psycopg2.connect(database="postgres", user = "postgres", password = "forex@123", host = "34.66.176.253", port = "5432")
+# mydb = psycopg2.connect(database="postgres", user = "postgres", password = "forex@123", host = "34.66.176.253", port = "5432")
 # print(mydb)
 # conn = create_engine("postgresql+psycopg2://postgres:%s@34.66.176.253/postgres" % quote('forex@123'))
-
+# def database_connection():
+#     mydb = mysql.connector.connect(
+#         host="localhost",
+#         user="root",
+#         password="admin",
+#         database="forex"
+#     )
+#     return mydb
 
 def insert_to_db(time, currency, time_interval, actual_high, actual_low, predicted_high, predicted_low,target_datetime):
     try:
-        mycursor = mydb.cursor()
+        connection = database_connection()
+        mycursor = connection.cursor()
         sql = "INSERT INTO multiple_currency_interval_prediction (time, currency, time_interval, actual_high, actual_low, predicted_high, predicted_low, target_datetime) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         val = (time, currency, time_interval, actual_high, actual_low, predicted_high, predicted_low, target_datetime)
         mycursor.execute(sql, val)
-        mydb.commit()
+        connection.commit()
         print(mycursor.rowcount, f" Record inserted successfully into table for {currency} at {time} for {time_interval} ")
 
     except:
@@ -189,8 +199,9 @@ while True:
                               int(utc_second))
 
     if utc_day_name != 'Sat' and utc_day_name != 'Sun':
-        mydb = psycopg2.connect(database="postgres", user="postgres", password="forex@123", host="34.66.176.253",
-                                port="5432")
+        connection = database_connection()
+        # mydb = psycopg2.connect(database="postgres", user="postgres", password="forex@123", host="34.66.176.253",
+        #                         port="5432")
 
         for currency in currency_ticks:
             for time_ in INTERVALS_LIST:

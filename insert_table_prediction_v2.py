@@ -4,13 +4,16 @@ import pytz
 import pandas as pd
 from datetime import datetime, timedelta
 import psycopg2
+from Database import database_connection
 
 BASE_MODEL_DIR = 'trained_models'
 
-mydb = psycopg2.connect(database="postgres", user = "postgres", password = "forex@123", host = "34.66.176.253", port = "5432")
-
-INTERVALS_LIST = ['1Min', '5Min', '15Min', '30Min', '60Min', '240Min']
 currency_ticks = os.listdir(BASE_MODEL_DIR)
+
+INTERVALS_LIST = []
+for i in currency_ticks:
+    INTERVALS_LIST = os.listdir(os.path.join(BASE_MODEL_DIR, f'{i}'))
+
 
 currency_predicted_list = []
 ticks_list_1min = []
@@ -30,7 +33,8 @@ freeze_1Min = False
 freeze_5Min = False
 
 def get_current_price_buy_sell(currency):
-    mycursor = mydb.cursor()
+    connection = database_connection()
+    mycursor = connection.cursor()
     sql = "select current_price from currency_buy_sell where currency = '"+ currency +"'"
     mycursor.execute(sql)
     current_price= mycursor.fetchall()[0]
@@ -38,11 +42,12 @@ def get_current_price_buy_sell(currency):
 
 def insert_to_db_1(currency, time_interval, high, high_prediction, date_time_hit_high, low, low_prediction,
                    date_time_hit_low):
-    mycursor = mydb.cursor()
+    connection = database_connection()
+    mycursor = connection.cursor()
     sql = "INSERT INTO predicted_high_low (currency, time_interval, high, high_prediction, date_time_hit_high, low, low_prediction, date_time_hit_low) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
     val = (currency, time_interval, high, high_prediction, date_time_hit_high, low, low_prediction, date_time_hit_low)
     mycursor.execute(sql, val)
-    mydb.commit()
+    connection.commit()
     # print(mycursor.rowcount, f" Record inserted successfully into table for {currency} at {time} for {time_interval} ")
 
     # except(Exception, psycopg.Error) as bulk_insert_error:
@@ -54,11 +59,12 @@ def fetch_data(currency):
     global currency_predicted_list
     dict = {}
     for time_interval in INTERVALS_LIST:
-        mycursor1 = mydb.cursor()
+        connection = database_connection()
+        mycursor = connection.cursor()
         sql = "SELECT predicted_high, predicted_low, target_datetime FROM multiple_currency_interval_prediction where " \
               "currency = '" + currency + "' and time_interval = '" + time_interval + "' order by time desc limit 1; "
-        mycursor1.execute(sql)
-        data = mycursor1.fetchall()
+        mycursor.execute(sql)
+        data = mycursor.fetchall()
         dict[time_interval] = data
 
     currency_predicted_list.append(dict)
@@ -70,9 +76,10 @@ def fetch_data(currency):
 
 
 def update_sql(sql_query):
-    mycursor = mydb.cursor()
+    connection = database_connection()
+    mycursor = connection.cursor()
     mycursor.execute(sql_query)
-    mydb.commit()
+    connection.commit()
     # print(mycursor.rowcount, "rows affected")
 
 
@@ -83,14 +90,16 @@ for currency in currency_ticks:
 
 
 def fetch_prediction_datetime(currency, time_):
-    mycursor = mydb.cursor()
+    connection = database_connection()
+    mycursor = connection.cursor()
     update_predicted_time = "SELECT date_time_hit_high, date_time_hit_low from predicted_high_low WHERE currency = '" + currency + "' and time_interval = '" + time_ + "'"
     mycursor.execute(update_predicted_time)
     return mycursor.fetchall()[0]
 
 
 def update_prediction_value(currency, time_):
-    mycursor = mydb.cursor()
+    connection = database_connection()
+    mycursor = connection.cursor()
     sql = "SELECT target_datetime, predicted_high, predicted_low FROM multiple_currency_interval_prediction " \
           "where time_interval = '" + time_ + "' and currency = '" + currency + "' order by time desc limit 1;"
     mycursor.execute(sql)
@@ -135,7 +144,6 @@ def update_actual_high_low(currency, time_):
     global freeze_1Min, freeze_5Min, freeze_dict, currency_dict, currency_dict_low, freeze_dict_low, prev_t_datetime
     datetime_now = datetime.utcnow()
     high, low = get_data_mt5(currency)
-
 
     t_datetime, p_high, p_low = update_prediction_value(currency, time_)
     t_datetime_high, t_datetime_low = fetch_prediction_datetime(currency, time_)
